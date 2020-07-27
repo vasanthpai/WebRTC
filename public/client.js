@@ -11,7 +11,9 @@ var loginInput = document.querySelector('#loginInput');
 var loginBtn = document.querySelector('#loginBtn');
 var otherUsernameInput = document.querySelector('#otherUsernameInput');
 var connectToOtherUsernameBtn = document.querySelector('#connectToOtherUsernameBtn');
-var connectedUser, myConnection;
+var msgInput = document.querySelector('#msgInput');
+var sendMsgBtn = document.querySelector('#sendMsgBtn');
+var connectedUser, myConnection, dataChannel;
 
 //when a user clicks the login button 
 loginBtn.addEventListener("click", function (event) {
@@ -43,7 +45,9 @@ loginBtn.addEventListener("click", function (event) {
                 onAnswer(data.answer);
                 break;
             case "candidate":
+                //console.log(data.candidate)
                 onCandidate(data.candidate);
+                
                 break;
             default:
                 break;
@@ -54,19 +58,23 @@ loginBtn.addEventListener("click", function (event) {
     function onLogin(success) {
         if (success === false) {
             alert("oops...try a different username");
-        } else {
+        } 
+        else {
             var configuration = {
-                "iceServers": [{ "url": "stun:stun.1.google.com:19302" }]
+                "iceServers": [{ urls: "stun:stun.1.google.com:19302" }]
             };
 
-            myConnection = new webkitRTCPeerConnection(configuration);
+            myConnection = new webkitRTCPeerConnection(configuration, { 
+                optional: [{RtpDataChannels: true}] 
+             });
+
             console.log("RTCPeerConnection object was created");
             console.log(myConnection);
 
             //setup ice handling
             //when the browser finds an ice candidate we send it to another peer 
             myConnection.onicecandidate = function (event) {
-
+                // console.log(event.candidate)
                 if (event.candidate) {
                     send({
                         type: "candidate",
@@ -74,6 +82,8 @@ loginBtn.addEventListener("click", function (event) {
                     });
                 }
             };
+            //console.log("Exchanged candidates, opening data channel")
+            openDataChannel();
         }
     };
 
@@ -128,15 +138,38 @@ loginBtn.addEventListener("click", function (event) {
         myConnection.addIceCandidate(new RTCIceCandidate(candidate));
     }
 
+    //creating data channel 
+    function openDataChannel() {
 
+        var dataChannelOptions = {
+            reliable: true
+        };
 
-    // connection.onopen = function () { 
-    //     console.log("Connected"); 
-    //  };
+        dataChannel = myConnection.createDataChannel("myDataChannel", dataChannelOptions);
+        // console.log("Data Channel Created")
+        dataChannel.onerror = function (error) {
+            console.log("Error:", error);
+        };
 
-    //  connection.onerror = function (err) { 
-    //     console.log("Got error", err); 
-    //  };
+        dataChannel.onmessage = function (event) {
+            console.log("Got message:", event.data);
+        };
+    }
+
+    //when a user clicks the send message button 
+    sendMsgBtn.addEventListener("click", function (event) {
+        console.log("send message");
+        var val = msgInput.value;
+        dataChannel.send(val);
+    });
+
+    ws.onopen = function () { 
+        console.log("Connected"); 
+     };
+
+     ws.onerror = function (err) { 
+        console.log("Got error", err); 
+     };
 
     // Alias for sending messages in JSON format 
     function send(message) {
